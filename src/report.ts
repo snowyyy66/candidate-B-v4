@@ -95,7 +95,13 @@ export function buildReport(input: Input, asOf: string): ContractRow[] {
     let directUnallocated = 0n;
     for (const p of paid.filter((x) => x.workId !== null)) {
       const id = p.workId!;
-      workPaid.set(id, workPaid.get(id)! + p.amount);
+      const w = works.find((x) => x.workId === id)!;
+      const cancelled = w.status === 'cancelled' && w.cancelledAt !== null && w.cancelledAt <= asOf;
+      const current = workPaid.get(id)!;
+      const capacity = cancelled || current >= w.price ? 0n : w.price - current;
+      const applied = p.amount < capacity ? p.amount : capacity;
+      workPaid.set(id, current + applied);
+      directUnallocated += p.amount - applied;
     }
     let contractUnallocated = 0n;
     const activeWorks = works.filter((w) => !(w.status === 'cancelled' && w.cancelledAt !== null && w.cancelledAt <= asOf));
@@ -111,20 +117,20 @@ export function buildReport(input: Input, asOf: string): ContractRow[] {
       }
       contractUnallocated += left;
     }
-    for (const p of paid.filter((x) => x.workId !== null)) {
-      const w = works.find((x) => x.workId === p.workId)!;
-      if (w.status === 'cancelled' && w.cancelledAt !== null && w.cancelledAt <= asOf) directUnallocated += p.amount;
-    }
     const workRows = works.map((w): WorkRow => {
       const cancelledByDate = w.status === 'cancelled' && w.cancelledAt !== null && w.cancelledAt <= asOf;
       const status = w.status === 'done' && w.completedAt !== null && w.completedAt > asOf ? 'planned'
         : w.status === 'cancelled' && w.cancelledAt !== null && w.cancelledAt > asOf ? 'planned' : w.status;
       const amountPaid = cancelledByDate ? 0n : workPaid.get(w.workId)!;
-      return { workId: w.workId, title: w.title, status, price: w.price, paid: amountPaid, remaining: w.price > amountPaid ? w.price - amountPaid : 0n };
+      const remaining = cancelledByDate ? 0n : w.price > amountPaid ? w.price - amountPaid : 0n;
+      return { workId: w.workId, title: w.title, status, price: w.price, paid: amountPaid, remaining };
     });
     const paidTotal = paid.reduce((sum, p) => sum + p.amount, 0n);
+    const cancelledValue = works.filter((w) => w.status === 'cancelled' && w.cancelledAt !== null && w.cancelledAt <= asOf)
+      .reduce((sum, w) => sum + w.price, 0n);
+    const obligation = contract.amount > cancelledValue ? contract.amount - cancelledValue : 0n;
     return { contractId: contract.contractId, contractor: contract.contractor, amount: contract.amount, paid: paidTotal,
-      remaining: contract.amount > paidTotal ? contract.amount - paidTotal : 0n, unallocatedPaid: contractUnallocated + directUnallocated, works: workRows };
+      remaining: obligation > paidTotal ? obligation - paidTotal : 0n, unallocatedPaid: contractUnallocated + directUnallocated, works: workRows };
   });
 }
 

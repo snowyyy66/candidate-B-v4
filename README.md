@@ -9,6 +9,8 @@
 ```bash
 npm install
 npm run report -- 2026-11-10
+npm test
+npm run typecheck
 ```
 
 Можно передать другую папку с CSV-файлами:

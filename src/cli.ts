@@ -1,7 +1,7 @@
 import { readFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
-import { buildReport, loadInput, renderReport } from './report.js';
+import { buildReport, loadInput, renderReport } from './report.ts';
 
 async function main(): Promise<void> {
   const [date, dataDir = 'data'] = process.argv.slice(2);
